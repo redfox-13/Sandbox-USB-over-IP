@@ -1,0 +1,7 @@
+services:
+  clamav:
+    image: clamav/clamav:latest
+    container_name: hourglass
+    restart: unless-stopped
+    ports:
+      - 3310:3310

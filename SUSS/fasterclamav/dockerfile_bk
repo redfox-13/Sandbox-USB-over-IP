@@ -1,0 +1,10 @@
+FROM clamav/clamav:latest
+
+# Configure clamd to listen on the network
+RUN echo "TCPSocket 3310" >> /etc/clamav/clamd.conf && \
+    echo "TCPAddr 0.0.0.0" >> /etc/clamav/clamd.conf
+
+# Pre-update the database
+RUN freshclam
+
+# The default entrypoint in clamav/clamav already starts clamd

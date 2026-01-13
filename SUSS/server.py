@@ -26,11 +26,11 @@ class FileScannerServicer(scanner_pb2_grpc.FileServiceServicer):
             time.sleep(2)
         return False
 
-    def _scan_single_file(self, ip, first_request, request_iterator):
+    def _scan_single_file(self, host, port, first_request, request_iterator):
         """Helper to process one file's worth of chunks from the stream."""
         client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
-            client.connect((ip, 3310))
+            client.connect((host, port))
             client.send(b"zINSTREAM\0")
 
             # 1. Process the first chunk already pulled from the iterator
@@ -68,10 +68,11 @@ class FileScannerServicer(scanner_pb2_grpc.FileServiceServicer):
                 image="fast-clamav:latest",
                 detach=True,
                 mem_limit="2g",
-                remove=True
+                remove=True,
+                ports={"3310/tcp": None}
             )
 
-            # 2. Get IP (with retry)
+            """ # 2. Get IP (with retry)
             for _ in range(10):
                 container.reload()
                 networks = container.attrs['NetworkSettings']['Networks']
@@ -81,17 +82,32 @@ class FileScannerServicer(scanner_pb2_grpc.FileServiceServicer):
                 time.sleep(1)
 
             if not ip:
-                raise Exception("Could not assign IP to container")
+                raise Exception("Could not assign IP to container") """
+            
+            container.reload()
+
+            port_info = container.attrs["NetworkSettings"]["Ports"]["3310/tcp"]
+            if not port_info:
+                raise Exception("ClamAV port not published")
+
+            host_port = int(port_info[0]["HostPort"])
+
 
             # 3. Wait for ClamAV DB to load
             print(f"Container {ip} started. Waiting for ClamAV...")
-            if not self._wait_for_clamav(ip):
+            if not self._wait_for_clamav("127.0.0.1", host_port):
                 raise Exception("ClamAV initialization timed out")
+
 
             # 4. Main Stream Loop
             # We manually call next() so we can pass control to the helper
             for request in request_iterator:
-                result_status = self._scan_single_file(ip, request, request_iterator)
+                result_status = self._scan_single_file(
+                    "127.0.0.1",
+                    host_port,
+                    request,
+                    request_iterator
+                )
                 
                 yield scanner_pb2.ScanResult(
                     path_within_directory=request.path_within_directory,

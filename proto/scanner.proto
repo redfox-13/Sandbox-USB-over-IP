@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+service FileService {
+  // Bidirectional stream: Client sends files, Server sends results
+  rpc ScanDirectory(stream ScanRequest) returns (stream ScanResult);
+}
+
+message ScanRequest {
+  string path_within_directory = 1; // e.g., "documents/invoice.pdf"
+  bytes chunk_data = 2;
+  bool end_of_file = 3; // True when a single file is finished
+}
+
+message ScanResult {
+  string path_within_directory = 1;
+  string status = 2; // CLEAN, INFECTED, or ERROR
+}

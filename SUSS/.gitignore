@@ -1,0 +1,35 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environments
+# We exclude the venv folder specifically, plus common alternatives
+.venv/
+.svenv/
+venv/
+ENV/
+env/
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# Unit test / coverage reports
+.pytest_cache/
+.tox/
+.coverage
+htmlcov/
+
+# Static analysis
+.mypy_cache/
+.ruff_cache/
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Local environment variables (Security!)
+.env
+.flaskenv

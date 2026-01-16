@@ -1,0 +1,13 @@
+[Unit]
+Description=CUBE USB Guard Service
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/usb_scanner
+ExecStart=/usr/bin/python3 /opt/usb_scanner/usb_guard.py
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

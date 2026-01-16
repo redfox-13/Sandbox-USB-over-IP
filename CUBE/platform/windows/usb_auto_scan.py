@@ -9,10 +9,12 @@ import argparse
 import logging
 from logging.handlers import RotatingFileHandler
 from datetime import datetime
+from scanner_client import ScannerClient, LogLevel
 
 # import ScannerClient lazily inside scan_drive_with_server to avoid import-time grpc dependency
 
 SERVER_IP="localhost:50051"
+LOG_LEVEL = LogLevel.BAD_ONLY
 
 def setup_logging():
     logger = logging.getLogger('usb_auto_scan')
@@ -423,14 +425,7 @@ def scan_drive_with_server(drive_path, server_addr=SERVER_IP, copy_to_temp=False
     Integrates with scanner_client.py to scan a drive and return a list 
     of result objects compatible with the existing reporting logic.
     """
-    try:
-        # Import the provided ScannerClient and LogLevel enum
-        from scanner_client import ScannerClient, LogLevel
-        client = ScannerClient(server_address=server_addr, log_level=LogLevel.INFO)
-    except Exception as e:
-        log_info(f"Could not import ScannerClient: {e}")
-        # Fallback to interactive dependency installation or mock (your existing logic)
-        return []
+    client = ScannerClient(server_address=server_addr, logger=logger, log_level=LogLevel.ERROR)
 
     # Local class to maintain compatibility with the rest of your script's "Step 4"
     class ScanResponse:

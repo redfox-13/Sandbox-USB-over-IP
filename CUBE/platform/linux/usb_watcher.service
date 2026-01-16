@@ -1,0 +1,11 @@
+[Unit]
+Description=CUBE USB Watcher (User Land)
+After=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /opt/usb_scanner/watcher.py
+Restart=always
+
+[Install]
+WantedBy=default.target

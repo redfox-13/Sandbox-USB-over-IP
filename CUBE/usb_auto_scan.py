@@ -12,6 +12,8 @@ from datetime import datetime
 
 # import ScannerClient lazily inside scan_drive_with_server to avoid import-time grpc dependency
 
+SERVER_IP="localhost:50051"
+
 def setup_logging():
     logger = logging.getLogger('usb_auto_scan')
     if logger.handlers:
@@ -416,7 +418,7 @@ def safely_eject_usb(drive_letter):
         return False, str(e)
 
 
-def scan_drive_with_server(drive_path, server_addr="localhost:50051", copy_to_temp=False):
+def scan_drive_with_server(drive_path, server_addr=SERVER_IP, copy_to_temp=False):
     """
     Integrates with scanner_client.py to scan a drive and return a list 
     of result objects compatible with the existing reporting logic.
@@ -590,7 +592,7 @@ def handle_new_drive_with_options(drive_letter, copy_to_temp=False):
         
         try:
             from scanner_client import ScannerClient
-            client = ScannerClient(server_address="localhost:50051")
+            client = ScannerClient(server_address=SERVER_IP)
         except Exception as e:
             log_info(f"\n✗ IMPORT ERROR: {e}")
             log_info(f"Options: (I)nstall requirements, (M)ock scan, (A)bort")
@@ -610,7 +612,7 @@ def handle_new_drive_with_options(drive_letter, copy_to_temp=False):
                     log_info(f"Failed: {ie}")
                 try:
                     from client_test import ScannerClient
-                    client = ScannerClient(server_address="localhost:50051")
+                    client = ScannerClient(server_address=SERVER_IP)
                 except Exception as e2:
                     log_info(f"Still failed: {e2}. Using mock scanner.")
                     client = None

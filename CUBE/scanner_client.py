@@ -19,7 +19,7 @@ class LogLevel(enum.IntEnum):
     WARN = 3
 
 class ScannerClient:
-    def __init__(self, server_address="localhost:50051", log_level=LogLevel.INFO):
+    def __init__(self, server_address="localhost:50051", log_level=LogLevel.WARN):
         self.server_address = server_address
         self.log_level = log_level
 

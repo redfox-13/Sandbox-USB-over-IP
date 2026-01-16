@@ -1,10 +1,8 @@
 FROM clamav/clamav:latest
 
-# Configure clamd to listen on the network
-RUN echo "TCPSocket 3310" >> /etc/clamav/clamd.conf && \
-    echo "TCPAddr 0.0.0.0" >> /etc/clamav/clamd.conf
+RUN sed -i 's/^TCPSocket.*/TCPSocket 3310/' /etc/clamav/clamd.conf && \
+    sed -i 's/^TCPAddr.*/TCPAddr 0.0.0.0/' /etc/clamav/clamd.conf
 
-# Pre-update the database
-RUN freshclam
+EXPOSE 3310
 
-# The default entrypoint in clamav/clamav already starts clamd
+CMD ["clamd", "--foreground=true"]

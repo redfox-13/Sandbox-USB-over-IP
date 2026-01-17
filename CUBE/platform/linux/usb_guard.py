@@ -15,6 +15,7 @@ from scanner_client import ScannerClient, LogLevel
 MOUNT_BASE = "/mnt/usb_scanner"
 SERVER_ADDRESS = "localhost:50051"
 LOG_LEVEL = LogLevel.BAD_ONLY
+CERT_FILE = "/opt/usb_scanner/dev_server.crt"
 
 hardware_lock = threading.Lock()
 
@@ -29,38 +30,15 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-def send_user_notification(title, message, urgency="normal"):
-    try:
-        # 1. Identify the active desktop user
-        # We look for the user owning the current console
-        user = subprocess.check_output(['stat', '-c', '%U', '/dev/console']).decode().strip()
-        # 2. Find their UID (typically 1000)
-        uid = subprocess.check_output(['id', '-u', user]).decode().strip()
-
-        # 3. Define the critical environment variables
-        # /run/user/UID/bus is the standard location on Arch/Hyprland
-        runtime_dir = f"/run/user/{uid}"
-        dbus_path = f"unix:path={runtime_dir}/bus"
-
-        # 4. Build the command using 'sudo -u' to act as that user
-        # We explicitly set the env vars so notify-send knows where to go
-        cmd = [
-            'sudo', '-u', user,
-            f'DBUS_SESSION_BUS_ADDRESS={dbus_path}',
-            f'XDG_RUNTIME_DIR={runtime_dir}',
-            'DISPLAY=:0',           # Fallback for X11/XWayland
-            'WAYLAND_DISPLAY=wayland-0', # Primary for Hyprland
-            'notify-send',
-            '-u', urgency,
-            '-a', 'CUBE Security',  # App Name
-            title, 
-            message
-        ]
-
-        subprocess.run(cmd, check=False)
-
-    except Exception as e:
-        logger.error(f"Notification bridge failed: {e}")
+def trigger_event(event_type, device, message):
+    event_data = {
+        "event": event_type,   # e.g., "BLOCK" or "SERVER_OFFLINE"
+        "device": device,
+        "message": message
+    }
+    # Write to the shared run directory
+    with open('/run/usb_scanner/event.json', 'w') as f:
+        json.dump(event_data, f)
 
 def remount_for_user(dev_node, label):
     """Standard mount for user access."""
@@ -73,29 +51,36 @@ def remount_for_user(dev_node, label):
     logger.info(f"Device {dev_node} is now available at {mount_path}")
 
 def process_disk_session(parent_node, partitions):
-    """Handles a USB stick session with a final summary and user-land handoff."""
     with hardware_lock:
-        # Use Unix timestamp (float)
-        session_start = time.time() 
-        all_infected_files = []
-
-        logger.info(f"NEW HARDWARE SESSION: {parent_node}")
-        # 1. PREVENT AUTO-MOUNT: Tell udisks2 to ignore this device
-        try:
-            subprocess.run(['udisksctl', 'lock', '--block-device', parent_node], check=False)
-        except Exception as e:
-            logger.debug(f"udisksctl lock hint failed (non-critical): {e}")
-
-        # 2. HARDWARE READ-ONLY LOCK
+        session_start = time.time()
+        
+        # 1. IMMEDIATE HARDWARE LOCK (Safety First)
         try:
             subprocess.run(['blockdev', '--setro', parent_node], check=True)
             logger.info(f"Hardware Write-Protection ENABLED for {parent_node}")
         except Exception as e:
-            logger.error(f"CRITICAL: Could not set read-only on {parent_node}: {e}")
-            return # Safety exit if we can't lock the hardware
+            logger.error(f"CRITICAL: Could not lock {parent_node}: {e}")
+            return 
 
-        client = ScannerClient(server_address=SERVER_ADDRESS, logger=logger, log_level=LOG_LEVEL)
+        # 2. SERVER CHECK (Fail-Safe)
+        # Check if cert exists before passing it
+        current_cert = CERT_FILE if os.path.exists(CERT_FILE) else None
+        client = ScannerClient(server_address=SERVER_ADDRESS, logger=logger, cert_path=current_cert)
 
+        logger.info("Verifying CUBE Scanner Server status...")
+        if not client.is_server_alive(timeout=4):
+            logger.critical("SECURITY BREACH PREVENTED: Scanner Server is OFFLINE.")
+
+            # Keep hardware locked and notify the user
+            trigger_event(
+                "Security Offline",
+                parent_node,
+                "Scanning server unreachable. USB remains locked."
+            )
+            return # EXIT: Do not proceed to mount or scan
+
+        # 3. PROCEED TO SCAN (Only if server is alive)
+        all_infected_files = []
         for dev_node in partitions:
             mount_path = os.path.join(MOUNT_BASE, os.path.basename(dev_node))
 
@@ -113,7 +98,8 @@ def process_disk_session(parent_node, partitions):
                 found_threats = client.scan_directory(mount_path)
                 
                 for threat in found_threats:
-                    all_infected_files.append(f"{dev_node}: {threat}")
+                    clean_threat = threat.strip()
+                    all_infected_files.append(f"{dev_node}: {clean_threat}")
 
             except Exception as e:
                 logger.error(f"Error processing {dev_node}: {e}")
@@ -156,10 +142,10 @@ def process_disk_session(parent_node, partitions):
         # We do NOT run 'blockdev --setrw' here. 
         # The device stays in Read-Only mode at the kernel level.
 
-        send_user_notification(
+        trigger_event(
             "USB Blocked",
-            f"Threats found on {parent_node}. Open USB resolver.",
-            urgency="critical"
+            parent_node,
+            f"Threats found on {parent_node}. Open USB resolver."
         )
     else:
         # CLEAN PATH: Immediate Hand-off
@@ -173,7 +159,7 @@ def process_disk_session(parent_node, partitions):
             label = os.path.basename(dev_node)
             remount_for_user(dev_node, label)
 
-        send_user_notification("USB Ready", "Scan complete. No threats found.")
+        trigger_event("USB Ready", parent_node, "Scan complete. No threats found.")
 
 def monitor_usb():
     context = pyudev.Context()

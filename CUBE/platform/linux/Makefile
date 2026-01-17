@@ -2,8 +2,10 @@ OPT_DIR = /opt/usb_scanner
 SYSTEMD_ROOT = /etc/systemd/system
 SYSTEMD_USER = /usr/lib/systemd/user
 PROTO_DIR = ../../../proto
+SERVER_DIR = ../../SUSS/
+DEV_CERT = dev_server.crt
 
-.PHONY: all install uninstall configure check-deps
+.PHONY: all install uninstall configure check-deps cert-sync
 
 all: configure
 
@@ -22,7 +24,15 @@ check-deps:
 	@python3 -c "import watchdog" 2>/dev/null || (echo "Missing watchdog. (Arch: python-watchdog)" && exit 1)
 	@python3 -c "import tkinter" 2>/dev/null || (echo "Missing tk. (Arch: tk)" && exit 1)
 
-install: check-deps
+cert-sync:
+	@if [ -f $(SERVER_DIR)/$(DEV_CERT) ]; then \
+		cp $(SERVER_DIR)/$(DEV_CERT) .; \
+		echo "Synced SSL certificate from server."; \
+	else \
+		echo "Warning: No server certificate found at $(SERVER_DIR). Running in insecure mode."; \
+	fi
+
+install: check-deps cert-sync
 	@echo "--- Installing Files ---"
 	install -d $(OPT_DIR)
 	install -d /run/usb_scanner
@@ -49,3 +59,5 @@ uninstall:
 	rm -f $(SYSTEMD_USER)/usb_watcher.service
 	systemctl daemon-reload
 
+tail:
+	journalctl -u usb_guard -f

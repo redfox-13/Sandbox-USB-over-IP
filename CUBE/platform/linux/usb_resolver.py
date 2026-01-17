@@ -1,4 +1,5 @@
 import os
+import time
 import json
 import tkinter as tk
 from tkinter import messagebox, scrolledtext
@@ -18,9 +19,10 @@ class USBResolverApp:
             return
         
         # Convert Unix float to readable string
-        dt_object = datetime.fromtimestamp(self.data['timestamp'])
+        ts_float = self.data.get('timestamp', time.time())
+        dt_object = datetime.fromtimestamp(ts_float)
         self.scan_time = dt_object.strftime('%Y-%m-%d %H:%M:%S')
-
+        
         self.root = tk.Tk()
         self.root.title("CUBE USB Security Resolver")
         self.root.geometry("550x450")

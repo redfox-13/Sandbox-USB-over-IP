@@ -19,10 +19,22 @@ class _LogLevel(enum.IntEnum):
     ERROR = 3
 
 class ScannerClient:
-    def __init__(self, server_address="localhost:50051", logger=None, log_level=LogLevel.BAD_ONLY):
+    def __init__(self, server_address="localhost:50051", logger=None, log_level=LogLevel.BAD_ONLY, cert_path = None):
         self.server_address = server_address
+        self.channel = grpc.insecure_channel(server_address)
         self.log_level = log_level
         self.logger = logger
+
+        if cert_path and os.path.exists(cert_path):
+            # SECURE TLS CONNECTION
+            with open(cert_path, 'rb') as f:
+                creds = grpc.ssl_channel_credentials(f.read())
+            self.channel = grpc.secure_channel(server_address, creds)
+            self.logger.info("Using encrypted TLS channel for gRPC.")
+        else:
+            # INSECURE CONNECTION
+            self.channel = grpc.insecure_channel(server_address)
+            self.logger.warning("Using insecure gRPC channel!")
 
     def _log(self, message, event_level):
         """
@@ -46,6 +58,16 @@ class ScannerClient:
         else:
             # Fallback to print if no logger is provided
             print(f"[{event_level.name}] {message}")
+
+    def is_server_alive(self, timeout=3):
+        """Checks if the gRPC server is responding."""
+        try:
+            # Attempts to connect to the channel within the timeout
+            grpc.channel_ready_future(self.channel).result(timeout=timeout)
+            return True
+        except (grpc.FutureTimeoutError, Exception) as e:
+            self.logger.error(f"Heartbeat failed for {self.server_address}: {e}")
+            return False
 
     def _file_generator(self, directory_path):
         for root, _, files in os.walk(directory_path):

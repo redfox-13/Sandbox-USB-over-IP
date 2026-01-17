@@ -1,3 +1,4 @@
+import os
 import grpc
 import socket
 import docker
@@ -7,6 +8,10 @@ from concurrent import futures
 from datetime import datetime
 import scanner_pb2
 import scanner_pb2_grpc
+
+PORT = "50051"
+CERT_FILE = "dev_server.crt"
+KEY_FILE = "dev_server.key"
 
 # Configure logging with timestamps
 logging.basicConfig(
@@ -183,12 +188,29 @@ def serve():
     logger.info("Initializing gRPC server...")
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     scanner_pb2_grpc.add_FileServiceServicer_to_server(FileScannerServicer(), server)
-    server.add_insecure_port('[::]:50051')
-    logger.info("=" * 80)
-    logger.info("gRPC Scanner Server is running on port 50051")
-    logger.info("Waiting for client connections...")
+
+    if os.path.exists(CERT_FILE) and os.path.exists(KEY_FILE):
+        with open(KEY_FILE, 'rb') as f:
+            private_key = f.read()
+        with open(CERT_FILE, 'rb') as f:
+            certificate_chain = f.read()
+
+        # Build TLS credentials
+        server_creds = grpc.ssl_server_credentials(((private_key, certificate_chain),))
+        
+        server.add_secure_port(f'[::]:{PORT}', server_creds)
+        logger.info(f"SERVER STARTING: Secure (TLS) on port {PORT}")
+    else:
+        # Fallback to Insecure
+        server.add_insecure_port(f'[::]:{PORT}')
+        logger.warning(f"SERVER STARTING: Insecure (Plaintext) on port {PORT}")
+        logger.warning("(To enable TLS, generate dev_server.crt and dev_server.key)")
+
     logger.info("=" * 80)
     server.start()
+    logger.info("Waiting for client connections...")
+    logger.info("=" * 80)
+
     try:
         server.wait_for_termination()
     except KeyboardInterrupt:

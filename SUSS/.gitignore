@@ -33,3 +33,10 @@ Thumbs.db
 # Local environment variables (Security!)
 .env
 .flaskenv
+
+# gRPC compiles
+*pb2*
+
+# test cert
+*.crt
+*.key

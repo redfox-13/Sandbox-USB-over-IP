@@ -19,20 +19,22 @@ class _LogLevel(enum.IntEnum):
     ERROR = 3
 
 class ScannerClient:
-    def __init__(self, server_address="localhost:50051", logger=None, log_level=LogLevel.BAD_ONLY, cert_path = None):
+    def __init__(self, server_address="localhost:50051", logger=None, log_level=LogLevel.BAD_ONLY, cert_path=None):
         self.server_address = server_address
-        self.channel = grpc.insecure_channel(server_address)
-        self.log_level = log_level
         self.logger = logger
+        self.log_level = log_level
 
-        if cert_path and os.path.exists(cert_path):
-            # SECURE TLS CONNECTION
-            with open(cert_path, 'rb') as f:
-                creds = grpc.ssl_channel_credentials(f.read())
-            self.channel = grpc.secure_channel(server_address, creds)
-            self.logger.info("Using encrypted TLS channel for gRPC.")
+        if cert_path:
+            if os.path.exists(cert_path):
+                with open(cert_path, 'rb') as f:
+                    creds = grpc.ssl_channel_credentials(f.read())
+                # Use secure_channel
+                self.channel = grpc.secure_channel(server_address, creds)
+                self.logger.info("Encrypted TLS channel initialized.")
+            else:
+                # CRITICAL: Don't fall back to insecure if a cert was explicitly requested!
+                raise FileNotFoundError(f"SSL Certificate not found at: {cert_path}")
         else:
-            # INSECURE CONNECTION
             self.channel = grpc.insecure_channel(server_address)
             self.logger.warning("Using insecure gRPC channel!")
 
@@ -98,22 +100,21 @@ class ScannerClient:
     def scan_directory(self, path):
         infected_files = []
         try:
-            with grpc.insecure_channel(self.server_address) as channel:
-                stub = scanner_pb2_grpc.FileServiceStub(channel)
-                # We wrap the call in a try-except to catch the Broken Pipe/gRPC errors
-                responses = stub.ScanDirectory(self._file_generator(path))
+            stub = scanner_pb2_grpc.FileServiceStub(self.channel)
+            # We wrap the call in a try-except to catch the Broken Pipe/gRPC errors
+            responses = stub.ScanDirectory(self._file_generator(path))
 
-                for response in responses:
-                    status = response.status.upper()
-                    output = f"[{status}] {response.path_within_directory}"
+            for response in responses:
+                status = response.status.upper()
+                output = f"[{status}] {response.path_within_directory}"
 
-                    if "INFECTED" in status:
-                        infected_files.append(response.path_within_directory)
-                        self._log(f"{output}", _LogLevel.INFECTED)
-                    elif "CLEAN" in status:
-                        self._log(f"{output}", _LogLevel.INFO)
-                    elif "ERROR" in status:
-                        self._log(f"{output}", _LogLevel.ERROR)
+                if "INFECTED" in status:
+                    infected_files.append(response.path_within_directory)
+                    self._log(f"{output}", _LogLevel.INFECTED)
+                elif "CLEAN" in status:
+                    self._log(f"{output}", _LogLevel.INFO)
+                elif "ERROR" in status:
+                    self._log(f"{output}", _LogLevel.ERROR)
 
         except Exception as e:
             self._log(f"Connection or Stream Error: {e}", LogLevel.ERROR)

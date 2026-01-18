@@ -15,7 +15,7 @@ from scanner_client import ScannerClient, LogLevel
 MOUNT_BASE = "/mnt/usb_scanner"
 SERVER_ADDRESS = "localhost:50051"
 LOG_LEVEL = LogLevel.BAD_ONLY
-CERT_FILE = "/opt/usb_scanner/dev_server.crt"
+CERT_FILE = "/opt/usb_scanner/certs/dev_server.crt"
 
 hardware_lock = threading.Lock()
 

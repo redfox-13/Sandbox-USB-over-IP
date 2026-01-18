@@ -586,7 +586,6 @@ def handle_new_drive_with_options(drive_letter, copy_to_temp=False):
         scan_path = tmpdir if tmpdir else drive_root
         
         try:
-            from scanner_client import ScannerClient
             client = ScannerClient(server_address=SERVER_IP)
         except Exception as e:
             log_info(f"\n✗ IMPORT ERROR: {e}")
@@ -606,7 +605,6 @@ def handle_new_drive_with_options(drive_letter, copy_to_temp=False):
                 except Exception as ie:
                     log_info(f"Failed: {ie}")
                 try:
-                    from client_test import ScannerClient
                     client = ScannerClient(server_address=SERVER_IP)
                 except Exception as e2:
                     log_info(f"Still failed: {e2}. Using mock scanner.")

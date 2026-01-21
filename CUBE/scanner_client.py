@@ -95,7 +95,7 @@ class ScannerClient:
                         end_of_file=True
                     )
                 except Exception as e:
-                    self._log(f"Error reading {rel_path}: {e}", LogLevel.ERROR)
+                    self._log(f"Error reading {rel_path}: {e}", _LogLevel.ERROR)
 
     def scan_directory(self, path):
         infected_files = []
@@ -117,7 +117,7 @@ class ScannerClient:
                     self._log(f"{output}", _LogLevel.ERROR)
 
         except Exception as e:
-            self._log(f"Connection or Stream Error: {e}", LogLevel.ERROR)
+            self._log(f"Connection or Stream Error: {e}", _LogLevel.ERROR)
 
         return infected_files
 

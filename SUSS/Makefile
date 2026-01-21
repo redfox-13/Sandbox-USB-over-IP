@@ -17,7 +17,12 @@ configure:
 	.build_venv/bin/pip install grpcio-tools protobuf > /dev/null
 	.build_venv/bin/python -m grpc_tools.protoc -I$(PROTO_DIR) \
 		--python_out=. --grpc_python_out=. $(PROTO_DIR)/scanner.proto
-	rm -rf .build_venv
+
+certs-out:
+	@if [ ! -f $(DEV_CERT) ]; then \
+		echo "Generating Dev SSL Certificates for other machines..."; \
+		openssl req -x509 -newkey rsa:4096 -keyout $(DEV_KEY) -out $(DEV_CERT) -days 365 -nodes -config openssl.conf -extensions v3_req; \
+	fi
 
 certs:
 	@if [ ! -f $(DEV_CERT) ]; then \
@@ -27,6 +32,7 @@ certs:
 
 clean:
 	rm -rf $(VENV)
+	rm -rf .build_venv
 	rm -f *_pb2*.py $(DEV_CERT) $(DEV_KEY)
 	@echo "Cleanup complete."
 

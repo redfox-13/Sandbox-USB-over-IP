@@ -16,7 +16,6 @@ configure:
 	.build_venv/bin/pip install grpcio-tools protobuf > /dev/null
 	.build_venv/bin/python -m grpc_tools.protoc -I$(PROTO_DIR) \
 		--python_out=. --grpc_python_out=. $(PROTO_DIR)/scanner.proto
-	rm -rf .build_venv
 
 check-deps:
 	@echo "--- Checking Dependencies ---"
@@ -73,3 +72,8 @@ uninstall:
 
 tail:
 	journalctl -u usb_guard -f
+
+clean:
+	rm -rf .build_venv
+	rm -f *_pb2*.py $(CERT_FILE)
+	@echo "Cleanup complete."
